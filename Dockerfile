@@ -1,4 +1,4 @@
-FROM bun:1.1.27
+FROM oven/bun:1.1.27
 
 # Set the working directory inside the container
 WORKDIR /app

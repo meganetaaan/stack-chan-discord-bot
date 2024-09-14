@@ -1,0 +1,21 @@
+{
+  "name": "discord-bot",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^1.8.3",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "openai": "^4.61.0"
+  }
+}

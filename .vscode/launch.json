@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Bun App",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "bun",
+      "program": "${workspaceFolder}/src/index.ts",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/**/*.ts"]
+    }
+  ]
+}

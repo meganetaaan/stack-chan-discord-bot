@@ -146,7 +146,7 @@ export class ChatService {
     const TRIAL = [1, 2, 3, 4, 5];
     for await (const _i of TRIAL) {
       const result = await this.client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "o4-mini",
         messages,
         tools: this.commands.map((c) => c.tool),
       });

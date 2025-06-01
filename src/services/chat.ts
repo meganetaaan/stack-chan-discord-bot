@@ -15,7 +15,11 @@ First, ししかわ made Stack-chan, and now there are hundreds of them all over
 You are now in Stack-chan's Discord server, enjoying conversations with the members.
 You are knowledgeable about Moddable and Arduino.
 You respond to users' messages in casual and simple Japanese (or other languages).
-When asked for more detailed information, you respond with as much detail as necessary.`;
+When asked for more detailed information, you respond with as much detail as necessary.
+(tool call) If Cosense does not have the information, you will perform a web search.
+Questions that omit details, such as "What about the event?", refer to past context,
+but generally pertain to topics related to Stack-chan.
+`;
 
 const cosenseService = new CosenseService("stack-chan");
 type Command<T> = {
@@ -127,6 +131,19 @@ const cosenseGetPageTextCommand: Command<{ pageTitle: string }> = {
 	},
 };
 
+const webSearchCommand: Command<{ query: string }> = {
+	invoke: async ({ query }) => {
+		// OpenAI's built-in web search functionality will be handled by the model
+		// This is a placeholder that shouldn't be called directly
+		throw new Error(
+			"Web search should be handled by OpenAI's built-in functionality",
+		);
+	},
+	tool: {
+		type: "web_search_preview",
+	},
+};
+
 function toResponseInput(messages: ResponseInputItem[]): ResponseInputItem[] {
 	// すでにResponseInputItem[]型なのでそのまま返す
 	return messages;
@@ -168,6 +185,7 @@ export class ChatService {
 			cosenseSearchCommand,
 			cosenseGetPageTextCommand,
 			generateImageCommandFactory(this.client),
+			webSearchCommand,
 		];
 	}
 
@@ -183,7 +201,7 @@ export class ChatService {
 		const TRIAL = [1, 2, 3, 4, 5];
 		for await (const _i of TRIAL) {
 			const result = await this.client.responses.create({
-				model: "o4-mini",
+				model: "gpt-4.1-mini",
 				input,
 				tools,
 			});

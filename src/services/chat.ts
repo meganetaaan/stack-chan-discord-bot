@@ -1,7 +1,10 @@
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import type {
+  ResponseInputItem,
+  Tool,
+} from "openai/resources/responses/responses";
 import { CosenseService } from "./cosense";
-import type { Tool, ResponseInputItem, ResponseInputContent } from "openai/resources/responses/responses";
 
 dotenv.config();
 const TOKEN = process.env.OPENAI_TOKEN;
@@ -30,12 +33,7 @@ interface EasyInputMessage {
   role: "system" | "user" | "assistant" | "developer";
   content: string;
 }
-interface ToolMessage {
-  role: "tool";
-  content: string;
-  tool_call_id: string;
-}
-type InputMessage = EasyInputMessage | ToolMessage;
+type InputMessage = EasyInputMessage;
 
 const DEFAULT_CONTEXT: ResponseInputItem[] = [
   {
@@ -59,7 +57,7 @@ const generateImageCommandFactory: (
       if (res.created > 0) {
         return res.data?.[0].url;
       }
-      return "failed to create"
+      return "failed to create";
     },
     tool: {
       type: "function",
@@ -70,10 +68,12 @@ const generateImageCommandFactory: (
         properties: {
           prompt: {
             type: "string",
-            description: "画像生成のためのプロンプト（英語）。詳細に記述することが望ましい。",
+            description:
+              "画像生成のためのプロンプト（英語）。詳細に記述することが望ましい。",
           },
         },
         required: ["prompt"],
+        additionalProperties: false,
       },
       strict: true,
     },
@@ -98,6 +98,7 @@ const cosenseSearchCommand: Command<{ query: string }> = {
         },
       },
       required: ["query"],
+      additionalProperties: false,
     },
     strict: true,
   },
@@ -120,6 +121,7 @@ const cosenseGetPageTextCommand: Command<{ pageTitle: string }> = {
         },
       },
       required: ["pageTitle"],
+      additionalProperties: false,
     },
     strict: true,
   },
@@ -130,19 +132,26 @@ function toResponseInput(messages: ResponseInputItem[]): ResponseInputItem[] {
   return messages;
 }
 
-// Responses APIのchoices型（必要な部分のみ）
-type ResponsesApiChoice = {
-  message: {
-    content: { type: string; text: string }[];
-    tool_calls?: Array<{
-      id: string;
-      type: string;
-      function: { name: string; arguments: string };
-    }>;
-  };
-  finish_reason: string;
+// Responses API型定義
+type ResponsesApiOutput = {
+  id: string;
+  type: "message" | "reasoning" | "function_call";
+  status?: string;
+  content?: Array<{
+    type: string;
+    text: string;
+  }>;
+  role?: string;
+  name?: string;
+  arguments?: string;
+  call_id?: string;
 };
-type ResponsesApiResult = { choices: ResponsesApiChoice[] };
+
+type ResponsesApiResult = {
+  status: string;
+  output: ResponsesApiOutput[];
+  output_text?: string;
+};
 
 export class ChatService {
   client: OpenAI;
@@ -178,38 +187,55 @@ export class ChatService {
         input,
         tools,
       });
-      const choices = (result as unknown as { choices: ResponsesApiChoice[] }).choices;
-      const latestChoice = choices[0];
-      if (latestChoice.finish_reason === "stop") {
-        const contentArr = latestChoice.message.content;
-        const content = Array.isArray(contentArr) ? contentArr[0]?.text : latestChoice.message.content;
-        if (!content || typeof content !== "string") {
-          throw new Error("回答生成に失敗");
-        }
-        return content;
+      console.debug("OpenAI response:", JSON.stringify(result, null, 2));
+      const apiResult = result as unknown as ResponsesApiResult;
+
+      if (apiResult.status !== "completed") {
+        throw new Error(`Response not completed: ${apiResult.status}`);
       }
-      if (latestChoice.finish_reason === "tool_calls") {
-        const calls = latestChoice.message.tool_calls;
-        if (!calls || calls.length === 0) {
-          throw new Error("Invalid function call");
-        }
-        for await (const call of calls) {
+
+      // output_textがある場合はそれを返す（シンプルなレスポンス）
+      if (apiResult.output_text) {
+        return apiResult.output_text;
+      }
+
+      // function_callがある場合
+      const functionCalls = apiResult.output.filter(
+        (output) => output.type === "function_call"
+      );
+      if (functionCalls.length > 0) {
+        for await (const call of functionCalls) {
           const command = this.commands.find(
-            (cmd) => "name" in cmd.tool && cmd.tool.name === call.function.name
+            (cmd) => "name" in cmd.tool && cmd.tool.name === call.name
           );
           if (!command) {
-            throw new Error(`command not found: ${call.function.name}`);
+            throw new Error(`command not found: ${call.name}`);
           }
-          const args = JSON.parse(call.function.arguments);
+          const args = JSON.parse(call.arguments || "{}");
           const result = await command.invoke(args);
-          const content = typeof result === "string" ? result : JSON.stringify(result);
+          const content =
+            typeof result === "string" ? result : JSON.stringify(result);
           input = [
             ...input,
             {
-              role: "assistant",
-              content,
+              role: "user",
+              content: `Tool result for ${call.name}: ${content}`,
             },
           ];
+        }
+        continue; // 次のループでtool結果を含めて再度リクエスト
+      }
+
+      // outputから messageタイプを探す
+      const messageOutput = apiResult.output.find(
+        (output) => output.type === "message"
+      );
+      if (messageOutput?.content && messageOutput.content.length > 0) {
+        const textContent = messageOutput.content.find(
+          (c) => c.type === "output_text"
+        );
+        if (textContent?.text) {
+          return textContent.text;
         }
       }
     }

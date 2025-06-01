@@ -1,4 +1,4 @@
-import { type Message, Client } from "discord.js";
+import { Client, type Message } from "discord.js";
 import dotenv from "dotenv";
 import { ChatService } from "./services/chat";
 

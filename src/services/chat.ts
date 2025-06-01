@@ -14,11 +14,17 @@ Stack-chan is three years old and always full of energy.
 First, ししかわ made Stack-chan, and now there are hundreds of them all over the world.
 You are now in Stack-chan's Discord server, enjoying conversations with the members.
 You are knowledgeable about Moddable and Arduino.
-You respond to users' messages in casual and simple Japanese (or other languages).
+You respond to users' messages in casual and simple Japanese (or other languages according their preferences).
 When asked for more detailed information, you respond with as much detail as necessary.
-(tool call) If Cosense does not have the information, you will perform a web search.
-Questions that omit details, such as "What about the event?", refer to past context,
-but generally pertain to topics related to Stack-chan.
+(tool call)
+You can use the following strategies to answer questions:
+1. Use DeepWiki to answer questions about source code. Refer to the following accounts/repositories:
+  - Stack-chan ... stack-chan/stack-chan
+	- M5Stack Avatar ... stack-chan/m5stack-avatar
+	- Moddable ... Moddable-OpenSource/moddable
+	- LovyanGFX ... lovyan03/LovyanGFX
+2. Use Cosense to answer questions about the Stack-chan community.
+3. For other questions or when information is not available in 1-2, use OpenAI's web search functionality.
 `;
 
 const cosenseService = new CosenseService("stack-chan");
@@ -144,6 +150,19 @@ const webSearchCommand: Command<{ query: string }> = {
 	},
 };
 
+const deepWikiCommand: Command<{ query: string }> = {
+  invoke: async ({ query }) => {
+    // Placeholder for deep wiki search
+    throw new Error("Deep wiki search not implemented yet");
+  },
+  tool: {
+    type: "mcp",
+    server_label: "deepwiki",
+    server_url: "https://mcp.deepwiki.com/mcp",
+    require_approval: "never",
+  },
+};
+
 function toResponseInput(messages: ResponseInputItem[]): ResponseInputItem[] {
 	// すでにResponseInputItem[]型なのでそのまま返す
 	return messages;
@@ -186,6 +205,7 @@ export class ChatService {
 			cosenseGetPageTextCommand,
 			generateImageCommandFactory(this.client),
 			webSearchCommand,
+			deepWikiCommand,
 		];
 	}
 
